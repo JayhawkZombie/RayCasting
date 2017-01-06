@@ -62,19 +62,18 @@ int main()
 
   system.AddLightObject({ 60, 70 }, { 180, 180 }, sf::Color::Black);
   system.AddLightObject({ 70, 150 }, { 100, 100 }, sf::Color::Black);
-  system.AddLightObject({ 50, 600 }, { 125, 35 }, sf::Color::Black);
   system.AddLightObject({ 550, 60 }, { 200, 90 }, sf::Color::Black);
-  system.AddLightObject({ 200, 200 }, { 80, 180 }, sf::Color::Black);
-  system.AddLightObject({ 500, 550 }, { 80, 40 }, sf::Color::Black);
-  system.AddLightObject({ 700, 500 }, { 80, 40 }, sf::Color::Black);
-  system.AddLightObject({ 300, 650 }, { 30, 25 }, sf::Color::Black);
+  //system.AddLightObject({ 200, 200 }, { 80, 180 }, sf::Color::Black);
+  //system.AddLightObject({ 500, 550 }, { 80, 40 }, sf::Color::Black);
+  //system.AddLightObject({ 700, 500 }, { 80, 40 }, sf::Color::Black);
+  //system.AddLightObject({ 300, 650 }, { 30, 25 }, sf::Color::Black);
 
   system.AddLight({ 400, 400 }, 400, sf::Color::Blue);
 
   std::size_t tri_to_draw = 0;
   window.setKeyRepeatEnabled(true);
 
-  float CircleRadius = 400.f;
+  float CircleRadius = 200.f;
 
   sf::CircleShape circle;
   circle.setRadius(CircleRadius);
@@ -92,7 +91,7 @@ int main()
   Colors.push_back(sf::Color(255, 255, 255, 100));
   Colors.push_back(sf::Color(0, 33, 255, 100));
 
-  
+
   //float Attenuation = 800.f;
   sf::Uint8 Intensity = 100;
 
@@ -116,7 +115,7 @@ int main()
 
   const std::size_t steps = 1000;
 
-  sf::Vector2f LightSpots[50] = 
+  sf::Vector2f LightSpots[50] =
   {
 
   };
@@ -135,13 +134,13 @@ int main()
 
   bool PrintPos = false;
 
-  system.AddComplexObject({ 
-    sf::Vector2f(400, 300) , 
-    sf::Vector2f(340, 380), 
-    sf::Vector2f(340, 340), 
+  system.AddComplexObject({
+    sf::Vector2f(400, 300) ,
+    sf::Vector2f(340, 380),
+    sf::Vector2f(340, 340),
     sf::Vector2f(340, 320),
     sf::Vector2f(400, 400)
-  
+
   });
 
   system.AddComplexObject({
@@ -156,6 +155,38 @@ int main()
   bool secondlight = false;
   bool thirdlight = false;
 
+  sf::Shader BlurShader;
+  sf::RenderTexture LightMapTexture;
+  sf::RenderTexture BlurredShadowsTexture;
+  sf::Sprite FinalShadowSprite;
+
+  BlurredShadowsTexture.create(800, 800);
+  BlurredShadowsTexture.clear(sf::Color::Transparent);
+  LightMapTexture.create(800, 800);
+  LightMapTexture.clear(sf::Color::Transparent);
+
+  BlurShader.loadFromFile("BlurShader.fsh", sf::Shader::Fragment);
+
+  sf::Sprite BlurredLightmap;
+  BlurredLightmap.setTexture(LightMapTexture.getTexture());
+
+  FinalShadowSprite.setTexture(BlurredShadowsTexture.getTexture());
+
+  sf::RenderStates BlurState;
+  sf::RenderStates ObjectState;
+
+  BlurState.blendMode = sf::BlendAdd;
+  BlurState.shader = &BlurShader;
+
+  ObjectState.blendMode = sf::BlendAdd;
+
+  bool UseBlurredTexture = false;
+  system.AttenuationRadius.setString("Light Attenuation: " + std::to_string(CircleRadius));
+
+  srand(NULL);
+
+  float x_pos{ 0.f }, y_pos{ 0.f }, width{ 0.f }, height{ 0.f };
+
 	while (window.isOpen())
 	{
 		sf::Event event;
@@ -163,6 +194,15 @@ int main()
 		{
       if (event.type == sf::Event::Closed)
         window.close();
+      else if (event.type == sf::Event::MouseButtonPressed) {
+        if (event.mouseButton.button == sf::Mouse::Button::Left) {
+          x_pos = (float)sf::Mouse::getPosition(window).x;
+          y_pos = (float)sf::Mouse::getPosition(window).y;
+          width = (float)(rand() % 100 + 50);
+          height = (float)(rand() % 100 + 50);
+          system.AddLightObject({ x_pos, y_pos }, { width, height }, sf::Color::Black);
+        }
+      }
       else if (event.type == sf::Event::KeyReleased) {
         if (event.key.code == sf::Keyboard::Space) {
           system.theta = 0;
@@ -171,12 +211,14 @@ int main()
 
         else if (event.key.code == sf::Keyboard::Up) {
           CircleRadius += 10;
+          system.AttenuationRadius.setString("Light Attenuation: " + std::to_string(CircleRadius));
           RecreateLightTexture(LightTexture, LightFragShader, Colors[current_color], CircleRadius, circle);
           //LightSystemState.texture = &LightTexture.getTexture();
         }
 
         else if (event.key.code == sf::Keyboard::Down) {
           CircleRadius -= 10;
+          system.AttenuationRadius.setString("Light Attenuation: " + std::to_string(CircleRadius));
           RecreateLightTexture(LightTexture, LightFragShader, Colors[current_color], CircleRadius, circle);
           //LightSystemState.texture = &LightTexture.getTexture();
         }
@@ -248,7 +290,29 @@ int main()
         system.AdvanceSweep(Light2Pos, 800.f);
     }
 
-    system.Render(window, LightSystemState);
+    if (UseBlurredTexture) {
+      BlurredShadowsTexture.clear(sf::Color::Transparent);
+      LightMapTexture.clear(sf::Color::Transparent);
+
+
+      system.RenderLightMap(LightMapTexture, LightSystemState);
+      LightMapTexture.display();
+
+      BlurShader.setUniform("SCENE", LightMapTexture.getTexture());
+      BlurShader.setUniform("light_pos", sf::Glsl::Vec2(sf::Vector2f(sf::Mouse::getPosition(window))));
+      BlurShader.setUniform("windowHeight", 800.f);
+      BlurShader.setUniform("radius", CircleRadius);
+
+      BlurredShadowsTexture.draw(BlurredLightmap, BlurState);
+      BlurredShadowsTexture.display();
+
+      system.RenderObjectsOnly(window);
+      window.draw(FinalShadowSprite, ObjectState);
+    }
+    else {
+      system.Render(window, LightSystemState);
+    }
+
 
 		window.display();
 	}

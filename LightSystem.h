@@ -78,13 +78,19 @@ public:
     IterationsAroundCircle.setFont(DrawFont);
     IterationsAroundCircle.setColor(sf::Color::White);
     IterationsAroundCircle.setCharacterSize(8);
-    IterationsAroundCircle.setPosition({ 20, 730 });
+    IterationsAroundCircle.setPosition({ 20, 610 });
 
     SecondLightText.setFont(DrawFont);
     SecondLightText.setColor(sf::Color::White);
     SecondLightText.setCharacterSize(8);
     SecondLightText.setPosition({ 10, 10 });
     SecondLightText.setString("Second Light: Disabled");
+
+    AttenuationRadius.setFont(DrawFont);
+    AttenuationRadius.setColor(sf::Color::White);
+    AttenuationRadius.setCharacterSize(8);
+    AttenuationRadius.setPosition({ 20, 630 });
+    AttenuationRadius.setString("Light Attenuation: ");
 
     ThirdLightText.setFont(DrawFont);
     ThirdLightText.setColor(sf::Color::White);
@@ -104,7 +110,8 @@ public:
       "Up:    Increase attenuation\n\n" \
       "Down:  Decrease attenuation\n\n" \
       "Right: Increase iterations around circle\n\n" \
-      "Left:  Decrease iterations around circle\n\n" 
+      "Left:  Decrease iterations around circle\n\n" \
+      "Left Mouse: Add object\n\n"
     );
 
     auto size = InstructionsText.getGlobalBounds();
@@ -115,7 +122,7 @@ public:
     InstructionsTexture.display();
 
     InstructionsSprite.setTexture(InstructionsTexture.getTexture());
-    InstructionsSprite.setPosition({ 10, 530 });
+    InstructionsSprite.setPosition({ 10, 650 });
 
     Edges.push_back({});
     Edges.back().Start = { 0, 0 }; Edges.back().End = { 0.f, 800.f };
@@ -180,6 +187,31 @@ public:
     }
   }
 
+  void RenderLightMap(sf::RenderTexture &tgt, sf::RenderStates &state)
+  {
+    for (auto & it = LitTriangles.rbegin(); it != LitTriangles.rend(); ++it)
+      tgt.draw(*it, state);
+  }
+
+  void RenderObjectsOnly(sf::RenderTarget &tgt)
+  {
+    tgt.draw(OverallBounds);
+
+    for (auto & obj : Objects)
+      obj.Render(tgt);
+
+    for (auto & seg : Segments)
+      tgt.draw(seg);
+
+    tgt.draw(IterationsAroundCircle);
+
+    tgt.draw(InstructionsSprite);
+
+    tgt.draw(StatusText);
+    tgt.draw(SecondLightText);
+    tgt.draw(ThirdLightText);
+  }
+
   void Render(sf::RenderTarget &tgt, sf::RenderStates &state) {
     static int framecnt = 0;
 
@@ -206,6 +238,7 @@ public:
     tgt.draw(StatusText);
     tgt.draw(SecondLightText);
     tgt.draw(ThirdLightText);
+    tgt.draw(AttenuationRadius);
   }
 
   void MoveObject(int which, float x_delta, float y_delta)
@@ -366,10 +399,14 @@ public:
 
 
   //start = starting end of the segment, end = the ending part of it, vector = the vector that *might* be between the two endpoints
-  bool CanIntersectSegment(sf::Vector2f start, sf::Vector2f end, sf::Vector2f light_source, sf::Vector2f vector)
+  bool CanIntersectSegment(sf::Vector2f start, sf::Vector2f end, sf::Vector2f light_source, sf::Vector2f vector, float rad)
   {
     sf::Vector2f VecToStart = start - light_source;
     sf::Vector2f VecToEnd = end - light_source;
+
+    //if the points are outside the attenuation radius, then there's no possibility it could hit it
+    if ((VecToStart.x > rad && VecToStart.y > rad) || (VecToEnd.x > rad && VecToEnd.y > rad))
+      return false;
 
     Normalize(VecToEnd);
     Normalize(VecToStart);
@@ -405,7 +442,7 @@ public:
     std::size_t index = 0;
     for (auto & edge : Edges) {
 
-      if (CanIntersectSegment(edge.Start, edge.End, LightSource, Point - LightSource)) {
+      if (CanIntersectSegment(edge.Start, edge.End, LightSource, Point - LightSource, Attenuation)) {
         MaybeClosestEdge = CastRay(LightSource, Point, edge.Start, edge.End);
 
         if ((Distance = DistanceBetween(LightSource, MaybeClosestEdge)) < MinDistance) {
@@ -462,6 +499,7 @@ public:
   sf::Text StatusText;
   sf::Text SecondLightText;
   sf::Text ThirdLightText;
+  sf::Text AttenuationRadius;
 
   sf::Text InstructionsText;
   sf::Sprite InstructionsSprite;
