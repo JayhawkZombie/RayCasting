@@ -30,7 +30,7 @@ public:
     /**
      * [  a   b   |   e  ]
      * [  c   d   |   f  ]
-     * 
+     *  Gaussean Elimination (with partial pivoting)
      * if (abs(c) > abs(a)) swap row(1) & row(2)
      */
     if (std::abs(c) > std::abs(a)) {
