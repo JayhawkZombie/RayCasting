@@ -69,22 +69,53 @@ public:
     FrameDelta.setCharacterSize(8);
     FrameDelta.setPosition({ 20, 700 });
 
+    StatusText.setFont(DrawFont);
+    StatusText.setColor(sf::Color::Green);
+    StatusText.setCharacterSize(12);
+    StatusText.setPosition({ 550, 30 });
+    StatusText.setString("Playing");
+
     IterationsAroundCircle.setFont(DrawFont);
     IterationsAroundCircle.setColor(sf::Color::White);
     IterationsAroundCircle.setCharacterSize(8);
     IterationsAroundCircle.setPosition({ 20, 730 });
 
-    SegmentHit.setFont(DrawFont);
-    SegmentHit.setColor(sf::Color::White);
-    SegmentHit.setCharacterSize(8);
-    SegmentHit.setPosition({ 20, 760 });
-    SegmentHit.setString("None");
+    SecondLightText.setFont(DrawFont);
+    SecondLightText.setColor(sf::Color::White);
+    SecondLightText.setCharacterSize(8);
+    SecondLightText.setPosition({ 10, 10 });
+    SecondLightText.setString("Second Light: Disabled");
 
-    LastHitSegment.setFont(DrawFont);
-    LastHitSegment.setColor(sf::Color::White);
-    LastHitSegment.setCharacterSize(8);
-    LastHitSegment.setPosition({ 20, 790 });
-    LastHitSegment.setString("-1");
+    ThirdLightText.setFont(DrawFont);
+    ThirdLightText.setColor(sf::Color::White);
+    ThirdLightText.setCharacterSize(8);
+    ThirdLightText.setPosition({ 10, 30 });
+    ThirdLightText.setString("Third Light: Disabled");
+
+    InstructionsText.setFont(DrawFont);
+    InstructionsText.setColor(sf::Color::White);
+    InstructionsText.setCharacterSize(6);
+    InstructionsText.setPosition(sf::Vector2f({ 10, 10 }));
+
+    InstructionsText.setString(
+      "Controls:\n\n" \
+      "C:     Change color\n\n" \
+      "P:     Pause\n\n"  \
+      "Up:    Increase attenuation\n\n" \
+      "Down:  Decrease attenuation\n\n" \
+      "Right: Increase iterations around circle\n\n" \
+      "Left:  Decrease iterations around circle\n\n" 
+    );
+
+    auto size = InstructionsText.getGlobalBounds();
+
+    InstructionsTexture.create((int)std::ceil(size.width) + 50, (int)std::ceil(size.height) + 50);
+    InstructionsTexture.clear(sf::Color::Transparent);
+    InstructionsTexture.draw(InstructionsText);
+    InstructionsTexture.display();
+
+    InstructionsSprite.setTexture(InstructionsTexture.getTexture());
+    InstructionsSprite.setPosition({ 10, 530 });
 
     Edges.push_back({});
     Edges.back().Start = { 0, 0 }; Edges.back().End = { 0.f, 800.f };
@@ -115,11 +146,6 @@ public:
     Objects.back().SetPosSize(pos, size);
     Objects.back().BlockingShape.setFillColor(color);
 
-    auto v0 = Objects.back().Vertices[0];
-    auto v1 = Objects.back().Vertices[1];
-    auto v2 = Objects.back().Vertices[2];
-    auto v3 = Objects.back().Vertices[3];
-
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { pos.x,          pos.y };           Segments.back()[1].position = { pos.x,          pos.y + size.y };
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { pos.x,          pos.y + size.y };  Segments.back()[1].position = { pos.x + size.x, pos.y + size.y };
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { pos.x + size.x, pos.y + size.y };  Segments.back()[1].position = { pos.x + size.x, pos.y };
@@ -142,22 +168,44 @@ public:
     Edges.back().FakeStart = { pos.x + size.x, pos.y };  Edges.back().FakeEnd = { pos.x, pos.y };
   }
 
+  void AddComplexObject(const std::vector<sf::Vector2f> &positions) {
+    for (std::size_t i = 1; i < positions.size(); ++i) {
+      Edges.push_back({}); Edges.back().Start = positions[i - 1]; Edges.back().End = positions[i];
+
+      Segments.push_back(sf::VertexArray(sf::Lines, 2)); 
+      Segments.back()[0].position = positions[i - 1];
+      Segments.back()[1].position = positions[i];
+      Segments.back()[0].color = sf::Color::Yellow;
+      Segments.back()[1].color = sf::Color::Yellow;    
+    }
+  }
+
   void Render(sf::RenderTarget &tgt, sf::RenderStates &state) {
     static int framecnt = 0;
 
     IterationsAroundCircle.setString("IterationsAround: " + std::to_string(2 * PI / dtheta));
-
+    
     tgt.draw(OverallBounds);
 
     for (auto & obj : Objects)
       obj.Render(tgt);
 
-    for (auto & tri : LitTriangles)
-      tgt.draw(tri, state);
+    for (auto & it = LitTriangles.rbegin(); it != LitTriangles.rend(); ++it)
+      tgt.draw(*it, state);
+
+    for (auto & seg : Segments)
+      tgt.draw(seg);
+
+    //for (auto & tri : LitTriangles)
+    //  tgt.draw(tri, state);
 
     tgt.draw(IterationsAroundCircle);
-    tgt.draw(SegmentHit);
-    tgt.draw(LastHitSegment);
+    
+    tgt.draw(InstructionsSprite);
+
+    tgt.draw(StatusText);
+    tgt.draw(SecondLightText);
+    tgt.draw(ThirdLightText);
   }
 
   void MoveObject(int which, float x_delta, float y_delta)
@@ -200,6 +248,18 @@ public:
 
   void AdvanceSweep(sf::Vector2f LightSource, float attenuation)
   {
+
+    //first move the bounding box with us
+    float LeftSide = LightSource.x - attenuation;
+    float RightSide = LightSource.x + attenuation;
+    float TopSide = LightSource.y - attenuation;
+    float BottomSide = LightSource.y + attenuation;
+
+    Edges[0].Start = { LeftSide, TopSide }; Edges[0].End = { RightSide, TopSide };
+    Edges[1].Start = { RightSide, TopSide }; Edges[1].End = { RightSide, BottomSide };
+    Edges[2].Start = { RightSide, BottomSide }; Edges[2].End = { LeftSide, BottomSide };
+    Edges[3].Start = { LeftSide, BottomSide }; Edges[3].End = { LeftSide, TopSide };
+
     static int frame_count = 0;
     static float x_dir = -1, y_dir = 0;
     static int LastHitEdge = -1;
@@ -207,13 +267,12 @@ public:
     static sf::Vector2f SEGMENT_STARTED;
     static sf::Vector2f SWEEP_VERY_BEGINNING;
 
-    dtheta = 2 * PI / breaks_around_circle;
-
     if (theta >= 2 * PI) {
-      LitTriangles.clear();
-      theta = 0;
       LastHitEdge = -1;
+      theta = 0;
     }
+
+    dtheta = 2 * PI / breaks_around_circle;
 
     std::chrono::system_clock::time_point Start = std::chrono::system_clock::now();
     sf::Vector2f Intersection;
@@ -278,7 +337,6 @@ public:
       }
 
       LastHitEdge = edge_index;
-      //LastHitSegment.setString("LastEdge: " + std::to_string(LastHitEdge));
 
       DrawSegment[0].position = { LightSource.x, LightSource.y }; DrawSegment[0].color = sf::Color::White;
       DrawSegment[1].position = { Intersection.x, Intersection.y }; DrawSegment[1].color = sf::Color::White;
@@ -287,7 +345,6 @@ public:
     std::chrono::system_clock::time_point End = std::chrono::system_clock::now();
 
     auto delta = End - Start;
-    //FrameDelta.setString("SweepTime: " + std::to_string(delta.count()));
 
     //on our very last iteration, we shouldn't have been able to cap off the last triangle. We need to do so
     LitTriangles.push_back(sf::VertexArray(sf::Triangles, 3));
@@ -300,6 +357,11 @@ public:
     LitTriangles.back()[2].position = sf::Vector2f({ SWEEP_VERY_BEGINNING.x, SWEEP_VERY_BEGINNING.y });
     LitTriangles.back()[2].texCoords = sf::Vector2f({ SWEEP_VERY_BEGINNING.x, SWEEP_VERY_BEGINNING.y }) - OffsetFromCenterOfTexture;
     LastHitEdge = -1;
+  }
+
+  void RefreshFrame()
+  {
+    LitTriangles.clear();
   }
 
 
@@ -385,6 +447,7 @@ public:
   float dtheta = 2 * PI / 500;
   int frame_delta = 0;
   int breaks_around_circle = 1000;
+  bool DoRefreshFrame = true;
 
   sf::Vector2f LastEdgeEnd;
   sf::Vector2f LastEdgePoint;
@@ -396,6 +459,13 @@ public:
   sf::Text IterationsAroundCircle;
   sf::Text SegmentHit;
   sf::Text LastHitSegment;
+  sf::Text StatusText;
+  sf::Text SecondLightText;
+  sf::Text ThirdLightText;
+
+  sf::Text InstructionsText;
+  sf::Sprite InstructionsSprite;
+  sf::RenderTexture InstructionsTexture;
 
   sf::Font DrawFont;
 
