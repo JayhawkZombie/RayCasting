@@ -11,7 +11,42 @@
 #define ____PI 3.141592653
 #define COSPIBY4 0.25
 
-const long double PI = 3.141592653589793238L;
+#define MAX_CIRCLE_ANGLE 512
+#define HALF_MAX_CIRCLE_ANGLE (MAX_CIRCLE_ANGLE >> 1)
+#define QUARTER_MAX_CIRCLE_ANGLE (MAX_CIRCLE_ANGLE >> 2)
+#define MASK_MAX_CIRCLE_ANGLE (MAX_CIRCLE_ANGLE - 1)
+#define PI 3.141592653589793238f
+
+#define USE_LOOKUP_TABLE
+
+float CosineTable[MAX_CIRCLE_ANGLE];
+
+inline void FtoInt(int *int_ptr, float f) {
+  __asm fld f
+  __asm mov edx, int_ptr
+  __asm FRNDINT
+  __asm fistp dword ptr[edx];
+}
+
+inline float fastcos(float n) {
+  float f = n * HALF_MAX_CIRCLE_ANGLE / PI;
+  int i;
+  FtoInt(&i, f);
+  return(
+    i < 0 ?
+    CosineTable[((-i) + QUARTER_MAX_CIRCLE_ANGLE) & MASK_MAX_CIRCLE_ANGLE] :
+    CosineTable[(i + QUARTER_MAX_CIRCLE_ANGLE) & MASK_MAX_CIRCLE_ANGLE] );
+}
+
+inline float fastsin(float n) {
+  float f = n * HALF_MAX_CIRCLE_ANGLE / PI;
+  int i;
+  FtoInt(&i, f);
+  return(
+    i < 0 ?
+    CosineTable[(-((-i)&MASK_MAX_CIRCLE_ANGLE)) + MAX_CIRCLE_ANGLE] :
+    CosineTable[i & MASK_MAX_CIRCLE_ANGLE]);
+}
 
 void Normalize(sf::Vector2f &v) {
   float mag = std::sqrt((v.x * v.x) + (v.y * v.y));
@@ -140,6 +175,13 @@ public:
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { 0.f,   800.f }; Segments.back()[1].position = { 800.f, 800.f };
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { 800.f, 800.f }; Segments.back()[1].position = { 0.f,   800.f };
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { 0.f,   800.f }; Segments.back()[1].position = { 0.f,   0.f };
+
+    //pre-compute all of our sin/cos values  
+    for (int i = 0; i < MAX_CIRCLE_ANGLE; ++i) {
+      CosineTable[i] = (float)(std::sin((double)i * PI / HALF_MAX_CIRCLE_ANGLE));
+    }
+
+
   }
   ~LightSystem() = default;
 
@@ -231,6 +273,13 @@ public:
     //for (auto & tri : LitTriangles)
     //  tgt.draw(tri, state);
 
+    if (DrawLightPaths) {
+      for (auto & l : Light1Path)
+        tgt.draw(l);
+      for (auto & l : Light2Path)
+        tgt.draw(l);
+    }
+
     tgt.draw(IterationsAroundCircle);
     
     tgt.draw(InstructionsSprite);
@@ -300,10 +349,13 @@ public:
     static sf::Vector2f SEGMENT_STARTED;
     static sf::Vector2f SWEEP_VERY_BEGINNING;
 
-    if (theta >= 2 * PI) {
-      LastHitEdge = -1;
-      theta = 0;
-    }
+    LAST_SEGMENT_ENDED = sf::Vector2f(window_size_x / 2.f, window_size_y);
+    SEGMENT_STARTED = sf::Vector2f(window_size_x / 2.f, window_size_y);
+    SWEEP_VERY_BEGINNING = sf::Vector2f(window_size_x / 2.f, window_size_y);
+
+    theta = 0;
+    LastHitEdge = -1;
+    int PIBY2OFFSET = (int)(breaks_around_circle / 4.f);
 
     dtheta = 2 * PI / breaks_around_circle;
 
@@ -316,11 +368,21 @@ public:
     sf::Vector2f OffsetFromCenterOfTexture = LightSource - CenterOfTexture;
 
     sf::Time START;
+    std::size_t index = 0;
+
+    //for (std::size_t i = 0; i < 1024; ++i) {
     while (theta <= 2 * PI) {
 
+#ifdef USE_LOOKUP_TABLE
+ 
+        y_dir = fastsin(theta);
+        x_dir = fastcos(theta);
+#else
+        y_dir = std::sin(theta);
+        x_dir = std::cos(theta);
+#endif
+
       theta += dtheta;
-      x_dir = std::sin(theta);
-      y_dir = std::cos(theta);
 
       sf::Vector2f dir{ x_dir, y_dir }; //should not need to normalize
 
@@ -333,7 +395,8 @@ public:
 
       if (FindClosestEdge(LightSource, furthest_point, attenuation, Intersection, edge_index)) {
 
-        if (LastHitEdge != edge_index) {      
+        //we just stepped off an edge
+        if (LastHitEdge != edge_index) {
           if (LastHitEdge != -1) {
 
             //and the ending point for the last segment will be determined by one final ray cast, exactly in the direction of the point, but at the segment we just left
@@ -405,8 +468,8 @@ public:
     sf::Vector2f VecToEnd = end - light_source;
 
     //if the points are outside the attenuation radius, then there's no possibility it could hit it
-    if ((VecToStart.x > rad && VecToStart.y > rad) || (VecToEnd.x > rad && VecToEnd.y > rad))
-      return false;
+    //if ((VecToStart.x > rad && VecToStart.y > rad) && (VecToEnd.x > rad && VecToEnd.y > rad))
+    //  return false;
 
     Normalize(VecToEnd);
     Normalize(VecToStart);
@@ -416,7 +479,7 @@ public:
     float _ccrossb = Cross2D(VecToEnd, vector);
     float _ccrossa = Cross2D(VecToEnd, VecToStart);
 
-    if ((_acrossb * _acrossc > 0) && (_ccrossb * _ccrossa > 0)) {
+    if ((_acrossb * _acrossc > 0) && (_ccrossb * _ccrossa >= 0)) {
       return true;
     }
 
@@ -483,8 +546,11 @@ public:
   float theta = 0;
   float dtheta = 2 * PI / 500;
   int frame_delta = 0;
-  int breaks_around_circle = 1000;
+  int breaks_around_circle = 1024;
   bool DoRefreshFrame = true;
+
+  float Cosines[1500];
+  float Sines[1500];
 
   sf::Vector2f LastEdgeEnd;
   sf::Vector2f LastEdgePoint;
@@ -500,6 +566,11 @@ public:
   sf::Text SecondLightText;
   sf::Text ThirdLightText;
   sf::Text AttenuationRadius;
+
+  std::vector<sf::VertexArray> Light1Path;
+  std::vector<sf::VertexArray> Light2Path;
+
+  bool DrawLightPaths = true;
 
   sf::Text InstructionsText;
   sf::Sprite InstructionsSprite;
@@ -533,5 +604,7 @@ public:
 
   unsigned int window_size_y;
   unsigned int window_size_x;
+
+  bool UseLookupTable = true;
 };
 

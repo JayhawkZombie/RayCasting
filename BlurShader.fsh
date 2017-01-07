@@ -1,5 +1,6 @@
 uniform float offset = 1.0/300;
 uniform sampler2D SCENE;
+uniform float radius;
 
 float BlurKernel[9] = float[](
     1.0 / 16, 2.0 / 16, 1.0 / 16,

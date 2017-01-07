@@ -5,6 +5,7 @@
 
 #include <SFML/Window.hpp>
 #include <SFML/Graphics.hpp>
+#include <SFML/OpenGL.hpp>
 #include <SFML/System.hpp>
 
 #include "LightSystem.h"
@@ -31,7 +32,7 @@ void RecreateLightTexture(sf::RenderTexture &LightTexture, sf::Shader &LightFrag
   circle.setPosition(sf::Vector2f({ 400.f, 400.f }));
   circle.setFillColor(sf::Color::Transparent);
 
-  LightTexture.clear(sf::Color::Transparent);
+  LightTexture.clear(sf::Color(0,0,0));
 
   LightTexture.draw(circle, &LightFragShader);
   LightTexture.display();
@@ -65,7 +66,7 @@ int main()
   system.AddLightObject({ 550, 60 }, { 200, 90 }, sf::Color::Black);
   //system.AddLightObject({ 200, 200 }, { 80, 180 }, sf::Color::Black);
   //system.AddLightObject({ 500, 550 }, { 80, 40 }, sf::Color::Black);
-  //system.AddLightObject({ 700, 500 }, { 80, 40 }, sf::Color::Black);
+  system.AddLightObject({ 700, 500 }, { 80, 40 }, sf::Color::Black);
   //system.AddLightObject({ 300, 650 }, { 30, 25 }, sf::Color::Black);
 
   system.AddLight({ 400, 400 }, 400, sf::Color::Blue);
@@ -95,7 +96,7 @@ int main()
   //float Attenuation = 800.f;
   sf::Uint8 Intensity = 100;
 
-  LightFragShader.setParameter("color", Colors[3]);
+  LightFragShader.setParameter("color", sf::Color(255, 255, 255, 100));
   LightFragShader.setParameter("center", { 400.f, 400.f });
   LightFragShader.setParameter("radius", { CircleRadius });
   LightFragShader.setParameter("expand", 0.2f);
@@ -120,17 +121,17 @@ int main()
 
   };
 
-  sf::Vector2f Light1Center(100, 600);
-  sf::Vector2f Light2Center(450, 150);
+  sf::Vector2f Light1Center(100.f, 600.f);
+  sf::Vector2f Light2Center(450.f, 150.f);
 
-  sf::Vector2f Light1Pos(200, 400);
-  sf::Vector2f Light2Pos(600, 600);
+  sf::Vector2f Light1Pos(200.f, 400.f);
+  sf::Vector2f Light2Pos(600.f, 600.f);
 
   float Light1Theta = 0;
   float Light2Theta = 0;
 
-  float Light1PathRad = 100;
-  float Light2PathRad = 50;
+  float Light1PathRad = 105.f;
+  float Light2PathRad = 55.f;
 
   bool PrintPos = false;
 
@@ -168,7 +169,7 @@ int main()
   BlurShader.loadFromFile("BlurShader.fsh", sf::Shader::Fragment);
 
   sf::Sprite BlurredLightmap;
-  BlurredLightmap.setTexture(LightMapTexture.getTexture());
+  //BlurredLightmap.setTexture(LightMapTexture.getTexture());
 
   FinalShadowSprite.setTexture(BlurredShadowsTexture.getTexture());
 
@@ -186,6 +187,28 @@ int main()
   srand(NULL);
 
   float x_pos{ 0.f }, y_pos{ 0.f }, width{ 0.f }, height{ 0.f };
+
+  sf::Vector2f Light1Dir(1, 0);
+  sf::Vector2f Light2Dir(1, 0);
+
+  sf::Vector2f Light1PreviousPos = Light1Pos + Light1Dir * Light1PathRad;
+  sf::Vector2f Light2PreviousPos = Light2Pos + Light2Dir * Light2PathRad;
+
+  //render the lit light texture to this and use it as a mash for the rest of the scene
+  //the brighter the color here, the brighter to make the pixel
+  sf::RenderTexture ShadowMask;
+  ShadowMask.create(800, 800);
+  ShadowMask.clear(sf::Color::Transparent);
+
+  sf::RenderTexture RenderedScene;
+  RenderedScene.create(800, 800);
+  RenderedScene.clear(sf::Color::Transparent);
+
+  sf::RectangleShape ShadowMaskQuad;
+  ShadowMaskQuad.setSize({ 800, 800 });
+
+  sf::Shader ShadowMaskShader;
+  ShadowMaskShader.loadFromFile("MaskShader.fsh", sf::Shader::Fragment);
 
 	while (window.isOpen())
 	{
@@ -221,6 +244,10 @@ int main()
           system.AttenuationRadius.setString("Light Attenuation: " + std::to_string(CircleRadius));
           RecreateLightTexture(LightTexture, LightFragShader, Colors[current_color], CircleRadius, circle);
           //LightSystemState.texture = &LightTexture.getTexture();
+        }
+
+        else if (event.key.code == sf::Keyboard::L) {
+          system.UseLookupTable = !system.UseLookupTable;
         }
 
         else if (event.key.code == sf::Keyboard::Q) {
@@ -272,48 +299,85 @@ int main()
 		window.clear();
 
     if (!paused) {
-      Light1Theta += 2 * PI / 1000;
-      Light2Theta += 2 * PI / 1000;
+      Light1Theta += 2 * PI / MAX_CIRCLE_ANGLE;
+      Light2Theta += 2 * PI / MAX_CIRCLE_ANGLE;
 
-      sf::Vector2f Light1Dir(std::cos(Light1Theta), std::sin(Light1Theta));
-      sf::Vector2f Light2Dir(std::cos(Light2Theta), std::sin(Light2Theta));
+      if (Light1Theta >= 2 * PI)
+        Light1Theta = 0;
+      if (Light2Theta >= 2 * PI)
+        Light2Theta = 0;
 
-      Light1Pos = Light1Center + Light1Dir * Light1PathRad;
-      Light2Pos = Light2Center + Light2Dir * Light2PathRad;
+#ifdef USE_LOOKUP_TABLE
+      Light1Dir = sf::Vector2f(fastcos(Light1Theta), fastsin(Light1Theta));
+      Light2Dir = sf::Vector2f(fastcos(Light2Theta), fastsin(Light2Theta));
+#else
+      Light1Dir = sf::Vector2f(std::cos(Light1Theta), std::sin(Light1Theta));
+      Light2Dir = sf::Vector2f(std::cos(Light2Theta), std::sin(Light2Theta));
+#endif
 
 
+      Light1Pos = Light1Center + (Light1Dir * Light1PathRad);
+      Light2Pos = Light2Center + (Light2Dir * Light2PathRad);
+
+      sf::VertexArray l1(sf::Lines, 2);
+      l1[0].position = Light1PreviousPos; l1[1].position = Light1Pos;
+      l1[0].color = sf::Color::Yellow; l1[1].color = sf::Color::Yellow;
+
+      sf::VertexArray l2(sf::Lines, 2);
+      l2[0].position = Light1PreviousPos; l2[1].position = Light1Pos;
+      l2[0].color = sf::Color::Yellow; l2[1].color = sf::Color::Yellow;
+
+      Light1PreviousPos = Light1Pos;
+      Light2PreviousPos = Light2Pos;
+      
       system.RefreshFrame();
       system.AdvanceSweep(sf::Vector2f(sf::Mouse::getPosition(window)), CircleRadius);
-      if (secondlight)
-        system.AdvanceSweep(Light1Pos, 800.f);
-      if (thirdlight)
-        system.AdvanceSweep(Light2Pos, 800.f);
+      if (secondlight) {
+        system.AdvanceSweep(Light1Pos, CircleRadius);
+        system.Light1Path.push_back(l1);
+      }
+      else
+        system.Light1Path.clear();
+      if (thirdlight) {
+        system.AdvanceSweep(Light2Pos, CircleRadius);
+        system.Light2Path.push_back(l2);
+      }
+      else
+        system.Light2Path.clear();
     }
 
-    if (UseBlurredTexture) {
-      BlurredShadowsTexture.clear(sf::Color::Transparent);
-      LightMapTexture.clear(sf::Color::Transparent);
+    ShadowMask.clear(sf::Color::Transparent);
+    RenderedScene.clear(sf::Color::Transparent);
+    BlurredShadowsTexture.clear(sf::Color::Transparent);
 
 
-      system.RenderLightMap(LightMapTexture, LightSystemState);
-      LightMapTexture.display();
+    //render normal geometry
+    system.RenderObjectsOnly(RenderedScene);
 
-      BlurShader.setUniform("SCENE", LightMapTexture.getTexture());
-      BlurShader.setUniform("light_pos", sf::Glsl::Vec2(sf::Vector2f(sf::Mouse::getPosition(window))));
-      BlurShader.setUniform("windowHeight", 800.f);
-      BlurShader.setUniform("radius", CircleRadius);
+    //render light map
+    system.RenderLightMap(ShadowMask, LightSystemState);
+    ShadowMask.display();
 
-      BlurredShadowsTexture.draw(BlurredLightmap, BlurState);
-      BlurredShadowsTexture.display();
+    //use a crappy convolution matrix to blur the light map (use Gaussian instead?)
+    BlurShader.setUniform("SCENE", ShadowMask.getTexture());
+    BlurShader.setUniform("windowHeight", 800.f);
+    BlurShader.setUniform("radius", CircleRadius);
+    BlurredLightmap.setTexture(ShadowMask.getTexture()); 
 
-      system.RenderObjectsOnly(window);
-      window.draw(FinalShadowSprite, ObjectState);
-    }
-    else {
-      system.Render(window, LightSystemState);
-    }
+    BlurredShadowsTexture.draw(BlurredLightmap, BlurState);
+    BlurredShadowsTexture.display();
 
+    window.clear(sf::Color::Black);
 
+    //Use the lightmap and the normal geometry in the MaskShader to render lights + geometry
+    ShadowMaskShader.setUniform("MaskTexture", BlurredShadowsTexture.getTexture());
+    ShadowMaskShader.setUniform("SceneTexture", RenderedScene.getTexture());
+    ShadowMaskShader.setUniform("MinimumIntensity", 1.0f);
+    ShadowMaskShader.setUniform("LightHue", sf::Glsl::Vec4(Colors[current_color]));
+    ShadowMaskShader.setUniform("HueIntensity", 0.3f);
+    ShadowMaskShader.setUniform("MaximumIntensity", 10.0f);
+    ShadowMaskQuad.setTexture(&BlurredShadowsTexture.getTexture());
+    window.draw(ShadowMaskQuad, &ShadowMaskShader);
 		window.display();
 	}
 
