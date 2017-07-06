@@ -1,7 +1,5 @@
 #pragma once
 
-#include "Vec.hpp"
-
 #include <vector>
 #include <iostream>
 
@@ -57,7 +55,7 @@ public:
 
   sf::RectangleShape BlockingShape;
 
-  sf::VertexArray Outlines[4]{ sf::VertexArray(sf::Lines, 2), sf::VertexArray(sf::Lines, 2), sf::VertexArray(sf::Lines, 2), sf::VertexArray(sf::Lines, 2) };
+  sf::VertexArray Outlines[4] { sf::VertexArray(sf::Lines, 2), sf::VertexArray(sf::Lines, 2), sf::VertexArray(sf::Lines, 2), sf::VertexArray(sf::Lines, 2) };
 
   sf::CircleShape Points[4];
 

@@ -7,6 +7,9 @@
 #include <math.h>
 #include <SFML/Graphics.hpp>
 #include <chrono>
+#include <memory>
+
+#define FLOAT_MAX 1E10
 
 #define ____PI 3.141592653
 #define COSPIBY4 0.25
@@ -34,8 +37,8 @@ inline float fastcos(float n) {
   FtoInt(&i, f);
   return(
     i < 0 ?
-    CosineTable[((-i) + QUARTER_MAX_CIRCLE_ANGLE) & MASK_MAX_CIRCLE_ANGLE] :
-    CosineTable[(i + QUARTER_MAX_CIRCLE_ANGLE) & MASK_MAX_CIRCLE_ANGLE] );
+    CosineTable[( ( -i ) + QUARTER_MAX_CIRCLE_ANGLE ) & MASK_MAX_CIRCLE_ANGLE] :
+    CosineTable[( i + QUARTER_MAX_CIRCLE_ANGLE ) & MASK_MAX_CIRCLE_ANGLE] );
 }
 
 inline float fastsin(float n) {
@@ -44,25 +47,25 @@ inline float fastsin(float n) {
   FtoInt(&i, f);
   return(
     i < 0 ?
-    CosineTable[(-((-i)&MASK_MAX_CIRCLE_ANGLE)) + MAX_CIRCLE_ANGLE] :
-    CosineTable[i & MASK_MAX_CIRCLE_ANGLE]);
+    CosineTable[( -( ( -i )&MASK_MAX_CIRCLE_ANGLE ) ) + MAX_CIRCLE_ANGLE] :
+    CosineTable[i & MASK_MAX_CIRCLE_ANGLE] );
 }
 
 void Normalize(sf::Vector2f &v) {
-  float mag = std::sqrt((v.x * v.x) + (v.y * v.y));
+  float mag = std::sqrt(( v.x * v.x ) + ( v.y * v.y ));
   v.x /= mag;
   v.y /= mag;
 }
 
 float Cross2D(const sf::Vector2f &v1, const sf::Vector2f &v2) {
-  return ((v1.x * v2.y) - (v1.y * v2.x));
+  return ( ( v1.x * v2.y ) - ( v1.y * v2.x ) );
 }
 
 float DistanceBetween(const sf::Vector2f &v1, const sf::Vector2f &v2) {
   float x = v1.x - v2.x;
   float y = v1.y - v2.y;
 
-  return (std::sqrt((x * x) + (y * y)));
+  return ( std::sqrt(( x * x ) + ( y * y )) );
 }
 
 struct Edge {
@@ -77,7 +80,7 @@ class Light {
 public:
   Light() = default;
   Light(const Light &other)
-    : 
+    :
     Position(other.Position),
     Radius(other.Radius),
     Color(other.Color),
@@ -100,41 +103,41 @@ public:
   LightSystem() {
     DrawFont.loadFromFile("ABSTRACT.TTF");
     FrameDelta.setFont(DrawFont);
-    FrameDelta.setColor(sf::Color::White);
+    FrameDelta.setFillColor(sf::Color::White);
     FrameDelta.setCharacterSize(8);
     FrameDelta.setPosition({ 20, 700 });
 
     StatusText.setFont(DrawFont);
-    StatusText.setColor(sf::Color::Green);
+    StatusText.setFillColor(sf::Color::Green);
     StatusText.setCharacterSize(12);
     StatusText.setPosition({ 550, 30 });
     StatusText.setString("Playing");
 
     IterationsAroundCircle.setFont(DrawFont);
-    IterationsAroundCircle.setColor(sf::Color::White);
+    IterationsAroundCircle.setFillColor(sf::Color::White);
     IterationsAroundCircle.setCharacterSize(8);
     IterationsAroundCircle.setPosition({ 20, 610 });
 
     SecondLightText.setFont(DrawFont);
-    SecondLightText.setColor(sf::Color::White);
+    SecondLightText.setFillColor(sf::Color::White);
     SecondLightText.setCharacterSize(8);
     SecondLightText.setPosition({ 10, 10 });
     SecondLightText.setString("Second Light: Disabled");
 
     AttenuationRadius.setFont(DrawFont);
-    AttenuationRadius.setColor(sf::Color::White);
+    AttenuationRadius.setFillColor(sf::Color::White);
     AttenuationRadius.setCharacterSize(8);
     AttenuationRadius.setPosition({ 20, 630 });
     AttenuationRadius.setString("Light Attenuation: ");
 
     ThirdLightText.setFont(DrawFont);
-    ThirdLightText.setColor(sf::Color::White);
+    ThirdLightText.setFillColor(sf::Color::White);
     ThirdLightText.setCharacterSize(8);
     ThirdLightText.setPosition({ 10, 30 });
     ThirdLightText.setString("Third Light: Disabled");
 
     InstructionsText.setFont(DrawFont);
-    InstructionsText.setColor(sf::Color::White);
+    InstructionsText.setFillColor(sf::Color::White);
     InstructionsText.setCharacterSize(6);
     InstructionsText.setPosition(sf::Vector2f({ 10, 10 }));
 
@@ -159,16 +162,16 @@ public:
     InstructionsSprite.setTexture(InstructionsTexture.getTexture());
     InstructionsSprite.setPosition({ 10, 650 });
 
-    Edges.push_back({});
+    Edges.push_back({ });
     Edges.back().Start = { 0, 0 }; Edges.back().End = { 0.f, 800.f };
 
-    Edges.push_back({});
+    Edges.push_back({ });
     Edges.back().Start = { 0.f, 800.f }; Edges.back().End = { 800.f, 800.f };
 
-    Edges.push_back({});
+    Edges.push_back({ });
     Edges.back().Start = { 800.f, 800.f }; Edges.back().End = { 800.f, 0.f };
 
-    Edges.push_back({});
+    Edges.push_back({ });
     Edges.back().Start = { 800.f, 0.f }; Edges.back().End = { 0.f, 0.f };
 
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { 0.f,   0.f };   Segments.back()[1].position = { 0.f,   800.f };
@@ -178,7 +181,7 @@ public:
 
     //pre-compute all of our sin/cos values  
     for (int i = 0; i < MAX_CIRCLE_ANGLE; ++i) {
-      CosineTable[i] = (float)(std::sin((double)i * PI / HALF_MAX_CIRCLE_ANGLE));
+      CosineTable[i] = (float)( std::sin((double)i * PI / HALF_MAX_CIRCLE_ANGLE) );
     }
 
 
@@ -191,7 +194,7 @@ public:
   }
 
   void AddLightObject(const sf::Vector2f &pos, const sf::Vector2f &size, sf::Color color) {
-    Objects.push_back({});
+    Objects.push_back({ });
     Objects.back().SetPosSize(pos, size);
     Objects.back().BlockingShape.setFillColor(color);
 
@@ -200,32 +203,32 @@ public:
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { pos.x + size.x, pos.y + size.y };  Segments.back()[1].position = { pos.x + size.x, pos.y };
     Segments.push_back(sf::VertexArray(sf::Lines, 2)); Segments.back()[0].position = { pos.x + size.x, pos.y };           Segments.back()[1].position = { pos.x,          pos.y };
 
-    Edges.push_back({});
-    Edges.back().Start     = { pos.x, pos.y };  Edges.back().End    = { pos.x, pos.y + size.y };
+    Edges.push_back({ });
+    Edges.back().Start = { pos.x, pos.y };  Edges.back().End = { pos.x, pos.y + size.y };
     Edges.back().FakeStart = { pos.x, pos.y }; Edges.back().FakeEnd = { pos.x, pos.y + size.y };
 
-    Edges.push_back({}); 
-    Edges.back().Start     = { pos.x, pos.y + size.y }; Edges.back().End     = { pos.x + size.x, pos.y + size.y };
-    Edges.back().FakeStart = { pos.x, pos.y + size.y }; Edges.back().FakeEnd = { pos.x + size.x, pos.y + size.y  };
+    Edges.push_back({ });
+    Edges.back().Start = { pos.x, pos.y + size.y }; Edges.back().End = { pos.x + size.x, pos.y + size.y };
+    Edges.back().FakeStart = { pos.x, pos.y + size.y }; Edges.back().FakeEnd = { pos.x + size.x, pos.y + size.y };
 
-    Edges.push_back({}); 
-    Edges.back().Start     = { pos.x + size.x, pos.y + size.y }; Edges.back().End     = { pos.x + size.x, pos.y };
+    Edges.push_back({ });
+    Edges.back().Start = { pos.x + size.x, pos.y + size.y }; Edges.back().End = { pos.x + size.x, pos.y };
     Edges.back().FakeStart = { pos.x + size.x, pos.y + size.y }; Edges.back().FakeEnd = { pos.x + size.x, pos.y };
 
-    Edges.push_back({}); 
-    Edges.back().Start     = { pos.x + size.x, pos.y };  Edges.back().End     = { pos.x, pos.y };
+    Edges.push_back({ });
+    Edges.back().Start = { pos.x + size.x, pos.y };  Edges.back().End = { pos.x, pos.y };
     Edges.back().FakeStart = { pos.x + size.x, pos.y };  Edges.back().FakeEnd = { pos.x, pos.y };
   }
 
   void AddComplexObject(const std::vector<sf::Vector2f> &positions) {
     for (std::size_t i = 1; i < positions.size(); ++i) {
-      Edges.push_back({}); Edges.back().Start = positions[i - 1]; Edges.back().End = positions[i];
+      Edges.push_back({ }); Edges.back().Start = positions[i - 1]; Edges.back().End = positions[i];
 
-      Segments.push_back(sf::VertexArray(sf::Lines, 2)); 
+      Segments.push_back(sf::VertexArray(sf::Lines, 2));
       Segments.back()[0].position = positions[i - 1];
       Segments.back()[1].position = positions[i];
       Segments.back()[0].color = sf::Color::Yellow;
-      Segments.back()[1].color = sf::Color::Yellow;    
+      Segments.back()[1].color = sf::Color::Yellow;
     }
   }
 
@@ -258,7 +261,7 @@ public:
     static int framecnt = 0;
 
     IterationsAroundCircle.setString("IterationsAround: " + std::to_string(2 * PI / dtheta));
-    
+
     tgt.draw(OverallBounds);
 
     for (auto & obj : Objects)
@@ -281,7 +284,7 @@ public:
     }
 
     tgt.draw(IterationsAroundCircle);
-    
+
     tgt.draw(InstructionsSprite);
 
     tgt.draw(StatusText);
@@ -314,7 +317,7 @@ public:
   }
 
   void AddLight(const sf::Vector2f &pt, float atten, sf::Color c) {
-    Lights.push_back({});
+    Lights.push_back({ });
     Lights.back().Color = c;
     Lights.back().Position = { pt.x, pt.y };
     Lights.back().Radius = atten;
@@ -349,13 +352,13 @@ public:
     static sf::Vector2f SEGMENT_STARTED;
     static sf::Vector2f SWEEP_VERY_BEGINNING;
 
-    LAST_SEGMENT_ENDED = sf::Vector2f(window_size_x / 2.f, window_size_y);
-    SEGMENT_STARTED = sf::Vector2f(window_size_x / 2.f, window_size_y);
-    SWEEP_VERY_BEGINNING = sf::Vector2f(window_size_x / 2.f, window_size_y);
+    LAST_SEGMENT_ENDED = sf::Vector2f(window_size_x / 2.f, static_cast<float>( window_size_y ));
+    SEGMENT_STARTED = sf::Vector2f(window_size_x / 2.f, static_cast<float>( window_size_y ));
+    SWEEP_VERY_BEGINNING = sf::Vector2f(window_size_x / 2.f, static_cast<float>( window_size_y ));
 
     theta = 0;
     LastHitEdge = -1;
-    int PIBY2OFFSET = (int)(breaks_around_circle / 4.f);
+    int PIBY2OFFSET = (int)( breaks_around_circle / 4.f );
 
     dtheta = 2 * PI / breaks_around_circle;
 
@@ -374,17 +377,17 @@ public:
     while (theta <= 2 * PI) {
 
 #ifdef USE_LOOKUP_TABLE
- 
-        y_dir = fastsin(theta);
-        x_dir = fastcos(theta);
+
+      y_dir = fastsin(theta);
+      x_dir = fastcos(theta);
 #else
-        y_dir = std::sin(theta);
-        x_dir = std::cos(theta);
+      y_dir = std::sin(theta);
+      x_dir = std::cos(theta);
 #endif
 
       theta += dtheta;
 
-      sf::Vector2f dir{ x_dir, y_dir }; //should not need to normalize
+      sf::Vector2f dir { x_dir, y_dir }; //should not need to normalize
 
       sf::Vector2f furthest_point = LightSource;
       furthest_point.x += x_dir * 800.f;
@@ -404,7 +407,7 @@ public:
             //now that we have that, we can cap off 
 
             LitTriangles.push_back(sf::VertexArray(sf::Triangles, 3));
-            LitTriangles.back()[0].position = sf::Vector2f({ LightSource.x, LightSource.y });         
+            LitTriangles.back()[0].position = sf::Vector2f({ LightSource.x, LightSource.y });
             LitTriangles.back()[0].texCoords = sf::Vector2f({ LightSource.x, LightSource.y }) - OffsetFromCenterOfTexture;
 
             LitTriangles.back()[1].position = sf::Vector2f({ SEGMENT_STARTED.x, SEGMENT_STARTED.y });
@@ -417,8 +420,7 @@ public:
             //for now, we will just use the intersecion point. This will be improved later
             //  IF we sweep around with a high enough precision, this will probably never be noticable
             SEGMENT_STARTED = Intersection;
-          }
-          else {
+          } else {
             //make sure we start off at the right point
             SEGMENT_STARTED = Intersection;
 
@@ -428,8 +430,7 @@ public:
 
           LastHitEdge = edge_index;
         }
-      }
-      else {
+      } else {
       }
 
       LastHitEdge = edge_index;
@@ -479,7 +480,7 @@ public:
     float _ccrossb = Cross2D(VecToEnd, vector);
     float _ccrossa = Cross2D(VecToEnd, VecToStart);
 
-    if ((_acrossb * _acrossc > 0) && (_ccrossb * _ccrossa >= 0)) {
+    if (( _acrossb * _acrossc > 0 ) && ( _ccrossb * _ccrossa >= 0 )) {
       return true;
     }
 
@@ -499,8 +500,8 @@ public:
     float MinDistance = FLOAT_MAX;
     bool DidIntersect = false;
 
-    sf::Vector2f ClosestEdge{ FLOAT_MAX, FLOAT_MAX };
-    sf::Vector2f MaybeClosestEdge{ FLOAT_MAX, FLOAT_MAX };
+    sf::Vector2f ClosestEdge { FLOAT_MAX, FLOAT_MAX };
+    sf::Vector2f MaybeClosestEdge { FLOAT_MAX, FLOAT_MAX };
     edge_index = -1;
     std::size_t index = 0;
     for (auto & edge : Edges) {
@@ -508,7 +509,7 @@ public:
       if (CanIntersectSegment(edge.Start, edge.End, LightSource, Point - LightSource, Attenuation)) {
         MaybeClosestEdge = CastRay(LightSource, Point, edge.Start, edge.End);
 
-        if ((Distance = DistanceBetween(LightSource, MaybeClosestEdge)) < MinDistance) {
+        if (( Distance = DistanceBetween(LightSource, MaybeClosestEdge) ) < MinDistance) {
           MinDistance = Distance;
           ClosestEdge = MaybeClosestEdge;
           edge_index = index;
@@ -527,11 +528,17 @@ public:
   }
 
   void DrawLightTexture(std::size_t which) {
-    LightShader.setParameter("color", Lights[which].Color);
-    LightShader.setParameter("center", Lights[which].Position);
-    LightShader.setParameter("radius", Lights[which].Radius);
-    LightShader.setParameter("expand", Lights[which].Expand);
-    LightShader.setParameter("windowHeight", window_size_y);
+    sf::Color lColor = Lights[which].Color;
+    sf::Vector2f lPos = Lights[which].Position;
+    float lRad = Lights[which].Radius;
+    float lExp = Lights[which].Expand;
+    float winHeight = static_cast<float>( window_size_y );
+
+    LightShader.setUniform("color", sf::Glsl::Vec4(lColor.r, lColor.g, lColor.b, lColor.a));
+    LightShader.setUniform("center", sf::Glsl::Vec2(lPos.x, lPos.y));
+    LightShader.setUniform("radius", lRad);
+    LightShader.setUniform("expand", lExp);
+    LightShader.setUniform("windowHeight", winHeight);
 
     LightTextures[which]->draw(Lights[which].Circle, &LightShader);
   }
@@ -579,7 +586,7 @@ public:
   sf::Font DrawFont;
 
   bool advancing = false;
-  
+
   std::vector<Edge> Edges;
   std::vector<sf::VertexArray> LitTriangles;
   sf::VertexArray CurrentTestingRay = sf::VertexArray(sf::Lines, 2);
@@ -607,4 +614,3 @@ public:
 
   bool UseLookupTable = true;
 };
-

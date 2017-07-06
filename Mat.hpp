@@ -1,4 +1,3 @@
-
 #include <math.h>
 #include <cmath>
 #pragma once
@@ -22,7 +21,7 @@ public:
   void SolveSystem() {
     //make sure the det is not zero
 
-    float det = (a * d) - (c * b);
+    float det = ( a * d ) - ( c * b );
 
     //if (std::abs(det) < 0.0001)
     //  throw std::runtime_error("Matrix is singular or there is no stable numerical solution");

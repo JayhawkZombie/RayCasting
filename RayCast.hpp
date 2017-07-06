@@ -7,12 +7,12 @@ sf::Vector2f CastRay(const sf::Vector2f &R0, const sf::Vector2f &RA, const sf::V
   /**
   *  RA(x2, y2)   * T (x4, y4)        L1: x1 + t * (x2 - x1)
   *      *        |                       y1 + t * (y2 - y1)
-  *         *     | L2                 
+  *         *     | L2
   *            *  |                   L2: x3 + v * (x4 - x3)
   *              (*)                      y3 + v * (y4 - y3)
   *               |  * L1
   *               |     *
-  *               |        * 
+  *               |        *
   *               B (x3, y3)  * R0 (x1, y1)
   *
   *  Simultaneous Equations:
@@ -39,8 +39,7 @@ sf::Vector2f CastRay(const sf::Vector2f &R0, const sf::Vector2f &RA, const sf::V
     system.SolveSystem();
     t = system.e;
     s = system.f;
-  }
-  catch (std::runtime_error &e)
+  } catch (std::runtime_error &e)
   {
     std::cerr << "Matrix error: " << e.what() << std::endl;
   }
