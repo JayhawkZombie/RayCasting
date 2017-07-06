@@ -22,17 +22,20 @@ std::shared_ptr<sf::RenderTexture> LightTexture;
 
 void RecreateLightTexture(sf::RenderTexture &LightTexture, sf::Shader &LightFragShader, const sf::Color &color, const float &radius, sf::CircleShape &circle)
 {
-  LightFragShader.setParameter("color", color);
-  LightFragShader.setParameter("center", { 400.f, 400.f });
-  LightFragShader.setParameter("radius", { radius });
-  LightFragShader.setParameter("expand", 0.2f);
+  sf::Glsl::Vec4 circle_color = { static_cast<float>( color.r ), static_cast<float>( color.g ), static_cast<float>( color.b ), static_cast<float>( color.a ) };
+  sf::Glsl::Vec2 center = { 400.f, 400.f };
+
+  LightFragShader.setUniform("color", circle_color);
+  LightFragShader.setUniform("center", center);
+  LightFragShader.setUniform("radius", radius);
+  LightFragShader.setUniform("expand", 0.2f);
 
   circle.setRadius(radius);
   circle.setOrigin(circle.getRadius(), circle.getRadius());
   circle.setPosition(sf::Vector2f({ 400.f, 400.f }));
   circle.setFillColor(sf::Color::Transparent);
 
-  LightTexture.clear(sf::Color(0,0,0));
+  LightTexture.clear(sf::Color(0, 0, 0));
 
   LightTexture.draw(circle, &LightFragShader);
   LightTexture.display();
@@ -96,11 +99,14 @@ int main()
   //float Attenuation = 800.f;
   sf::Uint8 Intensity = 100;
 
-  LightFragShader.setParameter("color", sf::Color(255, 255, 255, 100));
-  LightFragShader.setParameter("center", { 400.f, 400.f });
-  LightFragShader.setParameter("radius", { CircleRadius });
-  LightFragShader.setParameter("expand", 0.2f);
-  LightFragShader.setParameter("windowHeight", static_cast<float>(window.getSize().y));
+  sf::Glsl::Vec4 color = { 255, 255, 255, 100 };
+  sf::Glsl::Vec2 center = { 400.f, 400.f };
+  
+  LightFragShader.setUniform("color", color);
+  LightFragShader.setUniform("center", center);
+  LightFragShader.setUniform("radius", CircleRadius);
+  LightFragShader.setUniform("expand", 0.2f);
+  LightFragShader.setUniform("windowHeight", static_cast<float>( window.getSize().y ));
 
   LightTexture.draw(circle, &LightFragShader);
   LightTexture.display();
@@ -186,7 +192,7 @@ int main()
 
   srand(NULL);
 
-  float x_pos{ 0.f }, y_pos{ 0.f }, width{ 0.f }, height{ 0.f };
+  float x_pos { 0.f }, y_pos { 0.f }, width { 0.f }, height { 0.f };
 
   sf::Vector2f Light1Dir(1, 0);
   sf::Vector2f Light2Dir(1, 0);
@@ -210,23 +216,22 @@ int main()
   sf::Shader ShadowMaskShader;
   ShadowMaskShader.loadFromFile("MaskShader.fsh", sf::Shader::Fragment);
 
-	while (window.isOpen())
-	{
-		sf::Event event;
-		while (window.pollEvent(event))
-		{
+  while (window.isOpen())
+  {
+    sf::Event event;
+    while (window.pollEvent(event))
+    {
       if (event.type == sf::Event::Closed)
         window.close();
       else if (event.type == sf::Event::MouseButtonPressed) {
         if (event.mouseButton.button == sf::Mouse::Button::Left) {
           x_pos = (float)sf::Mouse::getPosition(window).x;
           y_pos = (float)sf::Mouse::getPosition(window).y;
-          width = (float)(rand() % 100 + 50);
-          height = (float)(rand() % 100 + 50);
+          width = (float)( rand() % 100 + 50 );
+          height = (float)( rand() % 100 + 50 );
           system.AddLightObject({ x_pos, y_pos }, { width, height }, sf::Color::Black);
         }
-      }
-      else if (event.type == sf::Event::KeyReleased) {
+      } else if (event.type == sf::Event::KeyReleased) {
         if (event.key.code == sf::Keyboard::Space) {
           system.theta = 0;
           system.AdvanceSweep({ 400.f, 400.f }, 400.f);
@@ -255,8 +260,7 @@ int main()
           for (auto & c : Colors)
             c.a = Intensity;
           RecreateLightTexture(LightTexture, LightFragShader, Colors[current_color], CircleRadius, circle);
-        }
-        else if (event.key.code == sf::Keyboard::A) {
+        } else if (event.key.code == sf::Keyboard::A) {
           Intensity -= 5;
           for (auto & c : Colors)
             c.a = Intensity;
@@ -272,7 +276,7 @@ int main()
 
         else if (event.key.code == sf::Keyboard::C) {
           //change colors, so redraw the light texture and assign to the light system
-          current_color = (current_color + 1) % Colors.size();
+          current_color = ( current_color + 1 ) % Colors.size();
           RecreateLightTexture(LightTexture, LightFragShader, Colors[current_color], CircleRadius, circle);
           //LightSystemState.texture = &LightTexture.getTexture();
         } //c clicked, change colors
@@ -280,23 +284,21 @@ int main()
           paused = !paused;
           system.StatusText.setString(paused ? "Paused" : "Playing");
           system.StatusText.setFillColor(paused ? sf::Color::Red : sf::Color::Green);
-        }
-        else if (event.key.code == sf::Keyboard::Num2) {
+        } else if (event.key.code == sf::Keyboard::Num2) {
           secondlight = !secondlight;
           system.SecondLightText.setString(secondlight ? "Second Light: Enabled" : "Second Light: Disabled");
           //Light1Theta = 0;
-        }
-        else if (event.key.code == sf::Keyboard::Num3) {
+        } else if (event.key.code == sf::Keyboard::Num3) {
           thirdlight = !thirdlight;
           system.ThirdLightText.setString(thirdlight ? "Third Light: Enabled" : "Third Light: Disabled");
           //Light2Theta = 0;
         }
       }
-		}
+    }
 
     LightSystemState.blendMode = sf::BlendAdd;
 
-		window.clear();
+    window.clear();
 
     if (!paused) {
       Light1Theta += 2 * PI / MAX_CIRCLE_ANGLE;
@@ -316,8 +318,8 @@ int main()
 #endif
 
 
-      Light1Pos = Light1Center + (Light1Dir * Light1PathRad);
-      Light2Pos = Light2Center + (Light2Dir * Light2PathRad);
+      Light1Pos = Light1Center + ( Light1Dir * Light1PathRad );
+      Light2Pos = Light2Center + ( Light2Dir * Light2PathRad );
 
       sf::VertexArray l1(sf::Lines, 2);
       l1[0].position = Light1PreviousPos; l1[1].position = Light1Pos;
@@ -329,20 +331,18 @@ int main()
 
       Light1PreviousPos = Light1Pos;
       Light2PreviousPos = Light2Pos;
-      
+
       system.RefreshFrame();
       system.AdvanceSweep(sf::Vector2f(sf::Mouse::getPosition(window)), CircleRadius);
       if (secondlight) {
         system.AdvanceSweep(Light1Pos, CircleRadius);
         system.Light1Path.push_back(l1);
-      }
-      else
+      } else
         system.Light1Path.clear();
       if (thirdlight) {
         system.AdvanceSweep(Light2Pos, CircleRadius);
         system.Light2Path.push_back(l2);
-      }
-      else
+      } else
         system.Light2Path.clear();
     }
 
@@ -362,7 +362,7 @@ int main()
     BlurShader.setUniform("SCENE", ShadowMask.getTexture());
     BlurShader.setUniform("windowHeight", 800.f);
     BlurShader.setUniform("radius", CircleRadius);
-    BlurredLightmap.setTexture(ShadowMask.getTexture()); 
+    BlurredLightmap.setTexture(ShadowMask.getTexture());
 
     BlurredShadowsTexture.draw(BlurredLightmap, BlurState);
     BlurredShadowsTexture.display();
@@ -378,8 +378,8 @@ int main()
     ShadowMaskShader.setUniform("MaximumIntensity", 10.0f);
     ShadowMaskQuad.setTexture(&BlurredShadowsTexture.getTexture());
     window.draw(ShadowMaskQuad, &ShadowMaskShader);
-		window.display();
-	}
+    window.display();
+  }
 
-	return 0;
+  return 0;
 }
